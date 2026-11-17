@@ -1,0 +1,7 @@
+data/
+logs/
+tests/
+models/reference.csv
+**/__pycache__/
+.venv/
+.pytest_cache/
