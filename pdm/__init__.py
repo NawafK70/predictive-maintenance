@@ -1,1 +1,1 @@
-"""Predictive maintenance: machine-failure risk model on the AI4I 2020 dataset."""
+"""Predictive maintenance: turbofan remaining-useful-life model on NASA C-MAPSS."""

@@ -1,5 +1,5 @@
 # Runtime deps for the API. scikit-learn must match the version the model was
-# trained with (see models/metadata.json), or joblib may fail to load the pipeline.
+# trained with (see models/<subset>/metadata.json), or joblib may fail to load the pipeline.
 fastapi==0.162.0
 uvicorn==0.54.0
 pydantic==2.14.2
@@ -7,7 +7,7 @@ pandas==3.1.0
 numpy==2.5.4
 scikit-learn==1.9.1
 joblib==1.6.0
-# Needed to load the model only if XGBoost wins model selection. On Linux (Docker)
+# XGBoost is the selected model on all four subsets. On Linux (Docker)
 # the CPU-only build avoids pulling ~200 MB of CUDA/NCCL libraries.
 xgboost-cpu==3.4.1; sys_platform == "linux"
 xgboost==3.4.1; sys_platform != "linux"
