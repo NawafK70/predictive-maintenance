@@ -2,3 +2,5 @@
 -r requirements-serve.txt
 pytest==9.2.0
 httpx==0.28.1
+# Demo
+streamlit==1.67.0

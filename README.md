@@ -10,6 +10,7 @@ pdm/
   train.py     engine-grouped CV, model comparison, NASA scoring, save
   api.py       FastAPI: /predict/{subset}, /models, /health
   monitor.py   PSI drift check of live readings vs training data
+demo/app.py    Streamlit demo: replay a test engine, watch the prediction evolve
 tests/         unit + API tests
 Dockerfile     serving image (bakes in models/)
 ```
@@ -21,8 +22,21 @@ pip install -r requirements.txt
 python -m pdm.data                  # download + summarise C-MAPSS
 python -m pdm.train --subset all    # ~5–10 min; or --subset FD001
 pytest -q
-uvicorn pdm.api:app --reload        # then open http://localhost:8000/docs
+streamlit run demo/app.py           # interactive demo, http://localhost:8501
+uvicorn pdm.api:app --reload        # REST API, http://localhost:8000/docs
 ```
+
+## Demo
+
+`demo/app.py` is a Streamlit app that replays engines from NASA's held-out test set. The model never saw these engines during training.
+
+- **Pick an engine:** choose a subset and an engine. Engines with the longest histories are listed first.
+- **Replay it:** drag the slider through its life. At each cycle you see:
+  - the predicted and actual remaining life
+  - a maintenance status: healthy, plan maintenance, or critical
+  - the full predicted-vs-actual trajectory, with a hover tooltip
+  - the four most informative sensors, as the model sees them: normalised per operating condition and smoothed
+- **Behind the scenes:** the app loads the trained pipelines from `models/` directly, so it doesn't need the API running.
 
 ## The dataset
 
