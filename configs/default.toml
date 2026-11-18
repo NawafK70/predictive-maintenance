@@ -1,0 +1,42 @@
+# Experiment configuration for `rul-train`.
+# Everything that affects the trained model lives here, and a copy is stored in
+# each model's metadata.json, so any result can be traced back to its settings.
+
+seed = 42
+
+[target]
+# Early in life an engine shows no degradation, so its true RUL can't be inferred.
+# Standard practice: cap the target ("piecewise-linear RUL").
+rul_cap = 125
+
+[features]
+short_window = 5    # rolling mean, cycles
+long_window = 20    # rolling mean, cycles
+slope_window = 20   # rolling least-squares slope, cycles
+
+[cv]
+n_splits = 5        # GroupKFold by engine
+
+# Candidate models, compared by cross-validated RMSE; the best one is refit and saved.
+# Remove a table to drop a candidate. Keys are passed to the estimator unchanged.
+[models.ridge]
+alpha = 1.0
+
+[models.random_forest]
+n_estimators = 200
+min_samples_leaf = 5
+max_features = 0.3
+
+[models.hist_gradient_boosting]
+learning_rate = 0.05
+max_iter = 500
+min_samples_leaf = 40
+l2_regularization = 1.0
+
+[models.xgboost]
+n_estimators = 600
+learning_rate = 0.03
+max_depth = 6
+subsample = 0.8
+colsample_bytree = 0.8
+min_child_weight = 5

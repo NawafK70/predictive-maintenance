@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Cache C-MAPSS
+        uses: actions/cache@v4
+        with:
+          path: data/raw/cmapss
+          key: cmapss-v1
+
+      - name: Download data
+        run: rul-data
+
+      # Trains the FD001 model so the inference and API tests run against a real artefact.
+      - name: Train FD001
+        run: rul-train --subset FD001
+
+      - name: Test
+        run: pytest

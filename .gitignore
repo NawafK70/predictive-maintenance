@@ -1,7 +1,16 @@
-data/raw/
-logs/
+# Data and trained artefacts are reproducible (rul-data, rul-train) and not versioned.
+data/
 models/
+logs/
+
+# Python
 __pycache__/
-.pytest_cache/
+*.egg-info/
+build/
+dist/
 .venv/
+.pytest_cache/
+.ruff_cache/
+
+# Local tooling
 .claude/

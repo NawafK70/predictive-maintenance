@@ -1,0 +1,134 @@
+{
+  "FD001": {
+    "model": "xgboost",
+    "model_version": "20261118-000022",
+    "cv": {
+      "ridge": {
+        "cv_rmse": 17.867,
+        "cv_rmse_std": 0.738
+      },
+      "random_forest": {
+        "cv_rmse": 14.263,
+        "cv_rmse_std": 0.401
+      },
+      "hist_gradient_boosting": {
+        "cv_rmse": 14.241,
+        "cv_rmse_std": 0.555
+      },
+      "xgboost": {
+        "cv_rmse": 13.925,
+        "cv_rmse_std": 0.417
+      }
+    },
+    "test": {
+      "rmse": 15.51,
+      "rmse_vs_capped_truth": 14.21,
+      "rmse_last_50_cycles": 6.72,
+      "mae": 11.49,
+      "nasa_score": 375.3,
+      "late_predictions_pct": 52.0,
+      "within_15_cycles_pct": 71.0,
+      "pct_engines_above_cap": 11.0,
+      "n_engines": 100
+    }
+  },
+  "FD002": {
+    "model": "xgboost",
+    "model_version": "20261118-000209",
+    "cv": {
+      "ridge": {
+        "cv_rmse": 19.129,
+        "cv_rmse_std": 0.367
+      },
+      "random_forest": {
+        "cv_rmse": 15.392,
+        "cv_rmse_std": 0.586
+      },
+      "hist_gradient_boosting": {
+        "cv_rmse": 15.194,
+        "cv_rmse_std": 0.496
+      },
+      "xgboost": {
+        "cv_rmse": 15.142,
+        "cv_rmse_std": 0.503
+      }
+    },
+    "test": {
+      "rmse": 26.48,
+      "rmse_vs_capped_truth": 14.4,
+      "rmse_last_50_cycles": 7.89,
+      "mae": 17.73,
+      "nasa_score": 8732.0,
+      "late_predictions_pct": 40.9,
+      "within_15_cycles_pct": 59.1,
+      "pct_engines_above_cap": 22.0,
+      "n_engines": 259
+    }
+  },
+  "FD003": {
+    "model": "xgboost",
+    "model_version": "20261118-000256",
+    "cv": {
+      "ridge": {
+        "cv_rmse": 17.942,
+        "cv_rmse_std": 0.796
+      },
+      "random_forest": {
+        "cv_rmse": 12.371,
+        "cv_rmse_std": 1.153
+      },
+      "hist_gradient_boosting": {
+        "cv_rmse": 12.291,
+        "cv_rmse_std": 1.319
+      },
+      "xgboost": {
+        "cv_rmse": 11.926,
+        "cv_rmse_std": 1.296
+      }
+    },
+    "test": {
+      "rmse": 15.46,
+      "rmse_vs_capped_truth": 13.63,
+      "rmse_last_50_cycles": 4.83,
+      "mae": 11.19,
+      "nasa_score": 387.1,
+      "late_predictions_pct": 52.0,
+      "within_15_cycles_pct": 73.0,
+      "pct_engines_above_cap": 15.0,
+      "n_engines": 100
+    }
+  },
+  "FD004": {
+    "model": "xgboost",
+    "model_version": "20261118-000453",
+    "cv": {
+      "ridge": {
+        "cv_rmse": 19.424,
+        "cv_rmse_std": 0.834
+      },
+      "random_forest": {
+        "cv_rmse": 14.6,
+        "cv_rmse_std": 1.118
+      },
+      "hist_gradient_boosting": {
+        "cv_rmse": 14.634,
+        "cv_rmse_std": 1.29
+      },
+      "xgboost": {
+        "cv_rmse": 14.473,
+        "cv_rmse_std": 1.22
+      }
+    },
+    "test": {
+      "rmse": 26.77,
+      "rmse_vs_capped_truth": 14.97,
+      "rmse_last_50_cycles": 9.67,
+      "mae": 19.23,
+      "nasa_score": 4562.3,
+      "late_predictions_pct": 46.4,
+      "within_15_cycles_pct": 55.2,
+      "pct_engines_above_cap": 27.0,
+      "n_engines": 248
+    }
+  }
+}

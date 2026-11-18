@@ -1,6 +1,6 @@
 """Data-drift check: compare logged API readings against the training data.
 
-Run:  python -m pdm.monitor --subset FD001 [--log logs/predictions.jsonl] [--min-rows 200]
+CLI:  rul-monitor --subset FD001 [--log logs/predictions.jsonl] [--min-rows 200]
 
 Uses the Population Stability Index (PSI) per setting/sensor:
   < 0.10 stable | 0.10-0.25 moderate shift | > 0.25 significant drift -> investigate/retrain
@@ -20,18 +20,27 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pdm import config
+from turbofan_rul import settings
 
 MODERATE, SIGNIFICANT = 0.10, 0.25
 
 
 def psi(expected: np.ndarray, actual: np.ndarray, bins: int = 10) -> float:
-    edges = np.unique(np.quantile(expected, np.linspace(0, 1, bins + 1)))
-    if len(edges) < 2:  # constant in training: any change is drift
-        return 0.0 if np.allclose(actual, expected[0]) else float("inf")
-    edges[0], edges[-1] = -np.inf, np.inf
-    e = np.histogram(expected, edges)[0] / len(expected)
-    a = np.histogram(actual, edges)[0] / len(actual)
+    """Population Stability Index of `actual` against the `expected` (training) distribution."""
+    # Round away float noise: values that went through CSV and JSON must compare equal.
+    expected, actual = np.round(expected, 6), np.round(actual, 6)
+    values = np.unique(expected)
+    if len(values) <= 2 * bins:
+        # Discrete feature (e.g. a setting with a handful of levels): compare the frequency
+        # of each value. Quantile bins would put edges exactly on the values themselves.
+        cats = np.union1d(values, np.unique(actual))
+        e = (expected[:, None] == cats).mean(axis=0)
+        a = (actual[:, None] == cats).mean(axis=0)
+    else:
+        edges = np.unique(np.quantile(expected, np.linspace(0, 1, bins + 1)))
+        edges[0], edges[-1] = -np.inf, np.inf
+        e = np.histogram(expected, edges)[0] / len(expected)
+        a = np.histogram(actual, edges)[0] / len(actual)
     e, a = np.clip(e, 1e-6, None), np.clip(a, 1e-6, None)
     return float(np.sum((a - e) * np.log(a / e)))
 
@@ -47,8 +56,8 @@ def drift_report(reference: pd.DataFrame, current: pd.DataFrame, columns: list[s
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--subset", default="FD001", choices=list(config.CMAPSS_SUBSETS))
-    parser.add_argument("--log", type=Path, default=config.PREDICTION_LOG)
+    parser.add_argument("--subset", default="FD001", choices=list(settings.SUBSETS))
+    parser.add_argument("--log", type=Path, default=settings.PREDICTION_LOG)
     parser.add_argument("--min-rows", type=int, default=200)
     args = parser.parse_args()
 
@@ -61,9 +70,9 @@ def main() -> int:
         print(f"Only {len(current)} logged predictions for {args.subset}; need {args.min_rows}.")
         return 0
 
-    model_dir = config.MODEL_DIR / args.subset
-    reference = pd.read_csv(model_dir / config.REFERENCE_FILE)
-    meta = json.loads((model_dir / config.METADATA_FILE).read_text())
+    model_dir = settings.MODEL_DIR / args.subset
+    reference = pd.read_csv(model_dir / settings.REFERENCE_FILE)
+    meta = json.loads((model_dir / settings.METADATA_FILE).read_text())
     columns = ["setting_1", "setting_2", "setting_3", *meta["sensors_used"]]
 
     report = drift_report(reference, current, columns)
@@ -74,7 +83,7 @@ def main() -> int:
 
     drifted = report.loc[report["status"] == "DRIFT", "feature"].tolist()
     if drifted:
-        print(f"\nDrift detected in {drifted} -> investigate and retrain (python -m pdm.train).")
+        print(f"\nDrift detected in {drifted} -> investigate and retrain (rul-train).")
         return 1
     print("\nNo significant drift.")
     return 0

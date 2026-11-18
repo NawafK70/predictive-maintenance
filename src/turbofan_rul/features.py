@@ -21,7 +21,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.cluster import KMeans
 
-from pdm.data import SENSORS, SETTINGS
+from turbofan_rul.data import SENSORS, SETTINGS
 
 REQUIRED = ["unit", "cycle", *SETTINGS, *SENSORS]
 
@@ -39,7 +39,7 @@ class RULFeaturizer(BaseEstimator, TransformerMixin):
         X = self._check(X)
         if self.n_conditions > 1:
             self.kmeans_ = KMeans(self.n_conditions, n_init=10, random_state=0).fit(X[SETTINGS].to_numpy())
-        cond = self._conditions(X)
+        cond = self.conditions(X)
         grouped = X[SENSORS].groupby(cond)
         mean, std = grouped.mean(), grouped.std().fillna(0.0)
         self.sensors_ = [s for s in SENSORS if (std[s] > 1e-6).any()]
@@ -53,10 +53,17 @@ class RULFeaturizer(BaseEstimator, TransformerMixin):
         )
         return self
 
-    def _conditions(self, X: pd.DataFrame) -> np.ndarray:
+    def conditions(self, X: pd.DataFrame) -> np.ndarray:
+        """Operating-condition (regime) id of each row."""
         if self.n_conditions == 1:
             return np.zeros(len(X), dtype=int)
         return self.kmeans_.predict(X[SETTINGS].to_numpy())
+
+    def normalize(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Sensors standardised within their operating condition (same row order as X)."""
+        cond = self.conditions(X)
+        z = (X[self.sensors_].to_numpy() - self.mean_.loc[cond].to_numpy()) / self.std_.loc[cond].to_numpy()
+        return pd.DataFrame(z, columns=self.sensors_, index=X.index)
 
     # -- transforming ---------------------------------------------------------
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -64,9 +71,7 @@ class RULFeaturizer(BaseEstimator, TransformerMixin):
         order = X.sort_values(["unit", "cycle"], kind="stable").index
         Xs = X.loc[order].reset_index(drop=True)
 
-        cond = self._conditions(Xs)
-        z = (Xs[self.sensors_].to_numpy() - self.mean_.loc[cond].to_numpy()) / self.std_.loc[cond].to_numpy()
-        z = pd.DataFrame(z, columns=self.sensors_)
+        z = self.normalize(Xs)
         units = Xs["unit"].to_numpy()
         t = Xs["cycle"].astype(float)
 

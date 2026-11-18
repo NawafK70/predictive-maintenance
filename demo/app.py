@@ -1,74 +1,51 @@
 """Interactive demo: replay a NASA test engine and watch the RUL prediction evolve.
 
-Run:  streamlit run demo/app.py
-(Needs trained models: python -m pdm.train --subset all)
+Run:  streamlit run demo/app.py      (after `rul-train --subset all`)
 """
 from __future__ import annotations
 
-import json
-import sys
-from pathlib import Path
+import altair as alt
+import numpy as np
+import pandas as pd
+import streamlit as st
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # make `pdm` importable
-
-import altair as alt  # noqa: E402
-import joblib  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import streamlit as st  # noqa: E402
-
-from pdm import config  # noqa: E402
-from pdm.data import load_test  # noqa: E402
+from turbofan_rul import settings
+from turbofan_rul.data import SENSOR_NAMES, load_test
+from turbofan_rul.inference import RULPredictor, available_models, engine_trajectory
 
 PREDICTED_COLOR = "#2a78d6"  # categorical slot 1 (blue)
 ACTUAL_COLOR = "#8a8984"     # neutral: ground truth is a reference, not a competing series
 MAINTENANCE_WINDOW = 50      # plan maintenance when predicted RUL drops below this
 CRITICAL = 20
-
-SUBSET_INFO = {
-    "FD001": "1 operating condition · 1 fault mode",
-    "FD002": "6 operating conditions · 1 fault mode",
-    "FD003": "1 operating condition · 2 fault modes",
-    "FD004": "6 operating conditions · 2 fault modes",
-}
-# Sensors that carry the clearest degradation signal, with their physical meaning.
-KEY_SENSORS = {
-    "s11": "HPC outlet static pressure",
-    "s4": "LPT outlet temperature",
-    "s12": "Fuel flow / Ps30 ratio",
-    "s7": "HPC outlet pressure",
-}
+# Sensors with the clearest degradation signal.
+KEY_SENSORS = {s: SENSOR_NAMES[s] for s in ("s11", "s4", "s12", "s7")}
 
 st.set_page_config(page_title="Turbofan RUL demo", page_icon="✈️", layout="wide")
 
 
 @st.cache_resource
-def load_model(subset: str):
-    d = config.MODEL_DIR / subset
-    return joblib.load(d / config.MODEL_FILE), json.loads((d / config.METADATA_FILE).read_text())
+def load_model(subset: str) -> RULPredictor:
+    return RULPredictor.load(settings.MODEL_DIR / subset)
 
 
 @st.cache_data
 def load_engines(subset: str) -> tuple[pd.DataFrame, dict[int, int]]:
     df, rul = load_test(subset)
-    return df, dict(zip(sorted(df["unit"].unique()), rul))
+    return df, dict(zip(sorted(df["unit"].unique()), rul, strict=True))
 
 
 @st.cache_data
 def trajectory(subset: str, unit: int) -> pd.DataFrame:
     """Prediction at every observed cycle. Features are causal, so the prediction at
     cycle t is exactly what the model would have said with only cycles 1..t."""
-    pipeline, meta = load_model(subset)
+    model = load_model(subset)
     df, final_rul = load_engines(subset)
     engine = df[df["unit"] == unit].sort_values("cycle")
-    feats = pipeline.named_steps["features"].transform(engine)
-    out = pd.DataFrame({
-        "cycle": engine["cycle"].to_numpy(),
-        "Predicted": np.clip(pipeline.predict(engine), 0, meta["rul_cap"]).round(1),
-        "Actual": final_rul[unit] + engine["cycle"].max() - engine["cycle"].to_numpy(),
-    })
+    out = engine_trajectory(model, engine, final_rul[unit]).rename(
+        columns={"predicted": "Predicted", "actual": "Actual"})
+    feats = model.featurizer.transform(engine)
     for s in KEY_SENSORS:
-        col = f"{s}_mean5"
+        col = f"{s}_mean{model.featurizer.short_window}"
         out[s] = feats[col].to_numpy() if col in feats else np.nan
     return out
 
@@ -138,15 +115,15 @@ def sensor_chart(traj: pd.DataFrame, sensor: str, now: int) -> alt.Chart:
 
 
 # --- sidebar ------------------------------------------------------------------
-subsets = [d.name for d in sorted(config.MODEL_DIR.iterdir())
-           if (d / config.MODEL_FILE).exists()] if config.MODEL_DIR.exists() else []
+subsets = available_models()
 if not subsets:
-    st.error("No trained models found. Run `python -m pdm.train --subset all` first.")
+    st.error("No trained models found. Run `rul-train --subset all` first.")
     st.stop()
 
 with st.sidebar:
     st.header("Engine")
-    subset = st.selectbox("Dataset", subsets, format_func=lambda s: f"{s} · {SUBSET_INFO.get(s, '')}")
+    subset = st.selectbox("Dataset", subsets,
+                          format_func=lambda s: f"{s} · {settings.SUBSET_DESCRIPTIONS.get(s, '')}")
     engines, final_rul = load_engines(subset)
     lengths = engines.groupby("unit")["cycle"].max()
     # Default to the engine with the longest history: the clearest degradation story.
@@ -160,8 +137,8 @@ with st.sidebar:
     st.caption("These engines are from NASA's held-out test set: the model never saw them in training. "
                "The actual RUL is known because NASA published each engine's remaining life.")
 
-pipeline, meta = load_model(subset)
-cap = int(meta["rul_cap"])
+model = load_model(subset)
+meta, cap = model.metadata, model.rul_cap
 row = traj[traj["cycle"] == now].iloc[0]
 pred, actual = float(row["Predicted"]), int(row["Actual"])
 
@@ -171,7 +148,7 @@ st.caption(f"{subset} · engine {unit} · cycle {now} of {last} observed · mode
            f"{meta['model_name']} ({meta['model_version']})")
 
 c1, c2, c3 = st.columns(3)
-c1.metric("Predicted RUL (cycles)", f"{pred:.0f}" + ("+" if pred >= cap - 0.5 else ""))
+c1.metric("Predicted RUL (cycles)", f"{pred:.0f}" + ("+" if model.is_at_cap(pred) else ""))
 c2.metric("Actual RUL (cycles)", f"{actual}")
 if actual > cap:
     c3.metric("Error (cycles)", "—", help=f"Actual RUL is above the {cap}-cycle cap, so there is "
@@ -184,10 +161,10 @@ show_status(pred, cap)
 st.altair_chart(rul_chart(traj, now, cap), use_container_width=True, theme="streamlit")
 
 st.subheader("Key sensors")
-st.caption("Normalised for the operating condition and smoothed over 5 cycles: the inputs the model "
-           "actually sees. Degradation shows up as a drift away from zero.")
+st.caption(f"Normalised for the operating condition and smoothed over {model.featurizer.short_window} "
+           "cycles: the inputs the model actually sees. Degradation shows up as a drift away from zero.")
 cols = st.columns(len(KEY_SENSORS))
-for col, sensor in zip(cols, KEY_SENSORS):
+for col, sensor in zip(cols, KEY_SENSORS, strict=True):
     col.markdown(f"**{KEY_SENSORS[sensor]}** `{sensor}`")
     col.altair_chart(sensor_chart(traj, sensor, now), use_container_width=True, theme="streamlit")
 
